@@ -29,6 +29,9 @@ export default function TerminalHacking() {
   const [guessHistory, setGuessHistory] = useState<
     Array<{ guess: string; result: string }>
   >([]);
+  const [usedBracketPositions, setUsedBracketPositions] = useState<Set<number>>(
+    new Set()
+  );
   const boardRef = useRef<HTMLDivElement>(null);
 
   const startNewGame = useCallback(() => {
@@ -39,6 +42,7 @@ export default function TerminalHacking() {
     setAttempts(MAX_ATTEMPTS);
     setGuessHistory([]);
     setGameOver(false);
+    setUsedBracketPositions(new Set());
     const newBoard = generateGameBoard(newWords, TOTAL_CHARS);
     setBoard(newBoard);
     setCursorPosition(0);
@@ -65,6 +69,50 @@ export default function TerminalHacking() {
       return null;
     },
     [board, words]
+  );
+
+  const findBracketPairAtPosition = useCallback(
+    (position: number): [number, number] | null => {
+      const openBrackets = ["(", "<", "{", "["];
+      const closeBrackets = [")", ">", "}", "]"];
+      const char = board[position];
+
+      // Check if it's any kind of bracket
+      if (openBrackets.includes(char) || closeBrackets.includes(char)) {
+        // Find matching closing bracket in the same line
+        const lineStart = Math.floor(position / BOARD_WIDTH) * BOARD_WIDTH;
+        const lineEnd = lineStart + BOARD_WIDTH;
+
+        // Find all valid bracket sequences in the line
+        const sequences: [number, number][] = [];
+
+        // For each opening bracket
+        for (let start = lineStart; start < lineEnd; start++) {
+          // Skip if this position was already used
+          if (usedBracketPositions.has(start)) continue;
+
+          const startChar = board[start];
+          const startBracketIndex = openBrackets.indexOf(startChar);
+          if (startBracketIndex === -1) continue;
+
+          // Look for its matching closing bracket
+          for (let end = start + 1; end < lineEnd; end++) {
+            if (board[end] === closeBrackets[startBracketIndex]) {
+              sequences.push([start, end]);
+            }
+          }
+        }
+
+        // Find the sequence that contains our cursor position
+        for (const [start, end] of sequences) {
+          if (position >= start && position <= end) {
+            return [start, end];
+          }
+        }
+      }
+      return null;
+    },
+    [board, usedBracketPositions]
   );
 
   const getMemoryAddress = (lineIndex: number) => {
@@ -102,7 +150,14 @@ export default function TerminalHacking() {
         case "ArrowLeft":
           setCursorPosition((prev) => {
             const currentCol = prev % BOARD_WIDTH;
+            const currentLine = Math.floor(prev / BOARD_WIDTH);
             if (currentCol === 0) {
+              // If at start of second column, jump to end of first column
+              if (currentLine >= BOARD_HEIGHT) {
+                return (
+                  (currentLine - BOARD_HEIGHT) * BOARD_WIDTH + (BOARD_WIDTH - 1)
+                );
+              }
               // If at start of first column, stay there
               return prev;
             }
@@ -126,14 +181,60 @@ export default function TerminalHacking() {
           break;
         case "Enter":
           const wordInfo = findWordAtPosition(cursorPosition);
+          const bracketPair = findBracketPairAtPosition(cursorPosition);
+
           if (wordInfo && attempts > 0) {
             handleGuess(wordInfo[1]);
+          } else if (bracketPair && attempts > 0) {
+            const [start, end] = bracketPair;
+            // Find a random word position that isn't the password
+            const allWordPositions: [number, string][] = [];
+            for (let i = 0; i < TOTAL_CHARS - WORD_LENGTH; i++) {
+              const word = board.slice(i, i + WORD_LENGTH);
+              if (words.includes(word) && word !== password) {
+                allWordPositions.push([i, word]);
+              }
+            }
+
+            if (allWordPositions.length > 0) {
+              // Choose a random word to remove
+              const [wordPos, removedWord] =
+                allWordPositions[
+                  Math.floor(Math.random() * allWordPositions.length)
+                ];
+
+              // Replace the word with dots
+              const newBoard = board.split("");
+              for (let i = wordPos; i < wordPos + WORD_LENGTH; i++) {
+                newBoard[i] = ".";
+              }
+              setBoard(newBoard.join(""));
+
+              // Mark this position as used
+              setUsedBracketPositions((prev) => new Set([...prev, start]));
+
+              // Add to history
+              const maxEntries = Math.floor((BOARD_HEIGHT * 1.5) / 4.5);
+              setGuessHistory((prev) => {
+                const newHistory = [...prev];
+                if (newHistory.length >= maxEntries) {
+                  newHistory.shift();
+                }
+                return [
+                  ...newHistory,
+                  {
+                    guess: board.slice(start, end + 1),
+                    result: `Dud removed: ${removedWord}`,
+                  },
+                ];
+              });
+            }
           } else if (!wordInfo && attempts > 0) {
             const maxEntries = Math.floor((BOARD_HEIGHT * 1.5) / 4.5);
             setGuessHistory((prev) => {
               const newHistory = [...prev];
               if (newHistory.length >= maxEntries) {
-                newHistory.shift(); // Remove oldest entry if at max
+                newHistory.shift();
               }
               return [
                 ...newHistory,
@@ -144,7 +245,17 @@ export default function TerminalHacking() {
           break;
       }
     },
-    [cursorPosition, gameOver, findWordAtPosition, attempts]
+    [
+      cursorPosition,
+      gameOver,
+      findWordAtPosition,
+      attempts,
+      board,
+      findBracketPairAtPosition,
+      words,
+      password,
+      usedBracketPositions,
+    ]
   );
 
   useEffect(() => {
@@ -195,6 +306,8 @@ export default function TerminalHacking() {
         return "bg-green-500 text-black";
       }
       const wordInfo = findWordAtPosition(cursorPosition);
+      const bracketPair = findBracketPairAtPosition(cursorPosition);
+
       if (
         wordInfo &&
         index >= wordInfo[0] &&
@@ -202,9 +315,12 @@ export default function TerminalHacking() {
       ) {
         return "bg-green-900";
       }
+      if (bracketPair && index >= bracketPair[0] && index <= bracketPair[1]) {
+        return "bg-green-900";
+      }
       return "";
     },
-    [cursorPosition, findWordAtPosition]
+    [cursorPosition, findWordAtPosition, findBracketPairAtPosition]
   );
 
   const renderBoard = () => {
