@@ -10,6 +10,7 @@ import {
 } from "../utils/gameUtils";
 
 import { Button } from "@/components/ui/Button";
+import { Tutorial } from "./Tutorial";
 
 const WORD_LENGTH = 6;
 const WORD_COUNT = 10;
@@ -33,6 +34,7 @@ export default function TerminalHacking() {
     new Set()
   );
   const boardRef = useRef<HTMLDivElement>(null);
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const startNewGame = useCallback(() => {
     const newWords = generateWords(WORD_LENGTH, WORD_COUNT);
@@ -483,7 +485,7 @@ export default function TerminalHacking() {
   };
 
   return (
-    <div className="crt-screen bg-black p-8 max-w-4xl mx-auto relative">
+    <div className="crt-screen bg-black p-16 max-w-4xl mx-auto relative">
       {/* Corner indents */}
       <div className="absolute inset-0 pointer-events-none">
         {/* Top left */}
@@ -497,7 +499,7 @@ export default function TerminalHacking() {
       </div>
 
       {/* Main terminal content */}
-      <div className="crt relative bg-black text-green-500 p-8 pb-16 font-mono text-base rounded-lg border border-green-500 min-h-[600px] flex flex-col">
+      <div className="crt relative bg-black text-green-500 p-8 pb-16 pt-12 font-mono text-base rounded-lg border border-green-500 min-h-[600px] flex flex-col">
         {/* Terminal border glow */}
         <div
           className="absolute inset-0 rounded-lg border-2 border-green-500/30 pointer-events-none"
@@ -507,9 +509,16 @@ export default function TerminalHacking() {
           }}
         />
 
-        <h1 className="text-2xl mb-6">
-          ROBCO INDUSTRIES (TM) TERMLINK PROTOCOL
-        </h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-2xl">ROBCO INDUSTRIES (TM) TERMLINK PROTOCOL</h1>
+          <Button
+            onClick={() => setShowTutorial(true)}
+            className="bg-green-500 hover:bg-green-600 text-black"
+          >
+            HELP
+          </Button>
+        </div>
+
         {renderAttempts()}
         <div className="flex gap-8 flex-1">
           <div className="flex-none">
@@ -536,6 +545,7 @@ export default function TerminalHacking() {
         </div>
       </div>
       {renderGameOverModal()}
+      {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
     </div>
   );
 }
