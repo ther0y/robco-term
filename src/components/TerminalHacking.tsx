@@ -205,11 +205,11 @@ export default function TerminalHacking() {
                   newHistory.shift();
                 }
                 return [
-                  ...newHistory,
                   {
                     guess: board.slice(start, end + 1),
                     result: "Attempts replenished!",
                   },
+                  ...newHistory,
                 ];
               });
             } else {
@@ -266,11 +266,11 @@ export default function TerminalHacking() {
                     newHistory.shift();
                   }
                   return [
-                    ...newHistory,
                     {
                       guess: board.slice(start, end + 1),
                       result: `Dud removed: ${removedWord}`,
                     },
+                    ...newHistory,
                   ];
                 });
               }
@@ -283,8 +283,8 @@ export default function TerminalHacking() {
                 newHistory.shift();
               }
               return [
-                ...newHistory,
                 { guess: "INVALID", result: "Invalid selection" },
+                ...newHistory,
               ];
             });
           }
@@ -319,7 +319,7 @@ export default function TerminalHacking() {
         if (newHistory.length >= maxEntries) {
           newHistory.shift(); // Remove oldest entry if at max
         }
-        return [...newHistory, entry];
+        return [entry, ...newHistory];
       });
     };
 
@@ -417,9 +417,9 @@ export default function TerminalHacking() {
     const recentHistory = guessHistory.slice(-maxEntries);
 
     return (
-      <div className="h-full">
+      <div className="h-full flex flex-col-reverse">
         {recentHistory.map((entry, index) => (
-          <div key={index} className="mb-[1.5em] last:mb-0">
+          <div key={index} className="mb-[1.5em]">
             <div className="text-green-500 leading-[1.5em] min-h-[1.5em] whitespace-pre-wrap">
               {`>`} {entry.guess}
             </div>
@@ -499,7 +499,7 @@ export default function TerminalHacking() {
       </div>
 
       {/* Main terminal content */}
-      <div className="crt relative bg-black text-green-500 p-8 pb-16 pt-12 font-mono text-base rounded-lg border border-green-500 min-h-[600px] flex flex-col">
+      <div className="crt relative bg-black text-green-500 p-8 pb-16 pt-12 font-mono text-base rounded-lg border border-green-500 min-h-[670px] flex flex-col">
         {/* Terminal border glow */}
         <div
           className="absolute inset-0 rounded-lg border-2 border-green-500/30 pointer-events-none"
