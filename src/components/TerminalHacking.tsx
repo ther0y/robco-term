@@ -187,28 +187,10 @@ export default function TerminalHacking() {
             handleGuess(wordInfo[1]);
           } else if (bracketPair && attempts > 0) {
             const [start, end] = bracketPair;
-            // Find a random word position that isn't the password
-            const allWordPositions: [number, string][] = [];
-            for (let i = 0; i < TOTAL_CHARS - WORD_LENGTH; i++) {
-              const word = board.slice(i, i + WORD_LENGTH);
-              if (words.includes(word) && word !== password) {
-                allWordPositions.push([i, word]);
-              }
-            }
 
-            if (allWordPositions.length > 0) {
-              // Choose a random word to remove
-              const [wordPos, removedWord] =
-                allWordPositions[
-                  Math.floor(Math.random() * allWordPositions.length)
-                ];
-
-              // Replace the word with dots
-              const newBoard = board.split("");
-              for (let i = wordPos; i < wordPos + WORD_LENGTH; i++) {
-                newBoard[i] = ".";
-              }
-              setBoard(newBoard.join(""));
+            // 1/10 chance to replenish attempts
+            if (Math.random() <= 0.2 && attempts < MAX_ATTEMPTS) {
+              setAttempts(MAX_ATTEMPTS);
 
               // Mark this position as used
               setUsedBracketPositions((prev) => new Set([...prev, start]));
@@ -224,10 +206,72 @@ export default function TerminalHacking() {
                   ...newHistory,
                   {
                     guess: board.slice(start, end + 1),
-                    result: `Dud removed: ${removedWord}`,
+                    result: "Attempts replenished!",
                   },
                 ];
               });
+            } else {
+              // Find a random word position that isn't the password
+              const allWordPositions: [number, string][] = [];
+              for (let i = 0; i < TOTAL_CHARS - WORD_LENGTH; i++) {
+                const word = board.slice(i, i + WORD_LENGTH);
+                // Double check to ensure we never remove the password
+                if (words.includes(word) && word !== password) {
+                  // Find all instances of this word
+                  let isPasswordPosition = false;
+                  for (let j = 0; j < WORD_LENGTH; j++) {
+                    // Check if this position overlaps with any instance of the password
+                    for (let k = 0; k < TOTAL_CHARS - WORD_LENGTH; k++) {
+                      if (
+                        board.slice(k, k + WORD_LENGTH) === password &&
+                        k <= i + j &&
+                        i + j < k + WORD_LENGTH
+                      ) {
+                        isPasswordPosition = true;
+                        break;
+                      }
+                    }
+                    if (isPasswordPosition) break;
+                  }
+                  if (!isPasswordPosition) {
+                    allWordPositions.push([i, word]);
+                  }
+                }
+              }
+
+              if (allWordPositions.length > 0) {
+                // Choose a random word to remove
+                const [wordPos, removedWord] =
+                  allWordPositions[
+                    Math.floor(Math.random() * allWordPositions.length)
+                  ];
+
+                // Replace the word with dots
+                const newBoard = board.split("");
+                for (let i = wordPos; i < wordPos + WORD_LENGTH; i++) {
+                  newBoard[i] = ".";
+                }
+                setBoard(newBoard.join(""));
+
+                // Mark this position as used
+                setUsedBracketPositions((prev) => new Set([...prev, start]));
+
+                // Add to history
+                const maxEntries = Math.floor((BOARD_HEIGHT * 1.5) / 4.5);
+                setGuessHistory((prev) => {
+                  const newHistory = [...prev];
+                  if (newHistory.length >= maxEntries) {
+                    newHistory.shift();
+                  }
+                  return [
+                    ...newHistory,
+                    {
+                      guess: board.slice(start, end + 1),
+                      result: `Dud removed: ${removedWord}`,
+                    },
+                  ];
+                });
+              }
             }
           } else if (!wordInfo && attempts > 0) {
             const maxEntries = Math.floor((BOARD_HEIGHT * 1.5) / 4.5);
