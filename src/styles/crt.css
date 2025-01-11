@@ -1,66 +1,66 @@
 @keyframes flicker {
     0% {
-      opacity: 0.27861;
+      opacity: 0.97;
     }
     5% {
-      opacity: 0.34769;
+      opacity: 0.95;
     }
     10% {
-      opacity: 0.23604;
+      opacity: 0.9;
     }
     15% {
-      opacity: 0.90626;
+      opacity: 0.95;
     }
     20% {
-      opacity: 0.18128;
+      opacity: 0.98;
     }
     25% {
-      opacity: 0.83891;
+      opacity: 0.95;
     }
     30% {
-      opacity: 0.65583;
+      opacity: 0.9;
     }
     35% {
-      opacity: 0.67807;
+      opacity: 0.95;
     }
     40% {
-      opacity: 0.26559;
+      opacity: 0.98;
     }
     45% {
-      opacity: 0.84693;
+      opacity: 0.95;
     }
     50% {
-      opacity: 0.96019;
+      opacity: 0.9;
     }
     55% {
-      opacity: 0.08594;
+      opacity: 0.95;
     }
     60% {
-      opacity: 0.20313;
+      opacity: 0.98;
     }
     65% {
-      opacity: 0.71988;
+      opacity: 0.95;
     }
     70% {
-      opacity: 0.53455;
+      opacity: 0.9;
     }
     75% {
-      opacity: 0.37288;
+      opacity: 0.95;
     }
     80% {
-      opacity: 0.71428;
+      opacity: 0.98;
     }
     85% {
-      opacity: 0.70419;
+      opacity: 0.95;
     }
     90% {
-      opacity: 0.7003;
+      opacity: 0.9;
     }
     95% {
-      opacity: 0.36108;
+      opacity: 0.95;
     }
     100% {
-      opacity: 0.24387;
+      opacity: 0.98;
     }
   }
   
@@ -166,32 +166,84 @@
   .crt-screen {
     position: relative;
     overflow: hidden;
-    border-radius: 20px;
-    box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+    transform-style: preserve-3d;
+    perspective: 1000px;
   }
   
   .crt-screen::before {
     content: "";
     position: absolute;
-    top: -50%;
-    left: -50%;
-    right: -50%;
-    bottom: -50%;
-    background: radial-gradient(circle, transparent 60%, rgba(0, 0, 0, 0.8) 100%);
-    z-index: 1;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      rgba(0, 0, 0, 0.2) 100%
+    );
     pointer-events: none;
   }
   
-  .crt-screen::after {
+  .crt {
+    position: relative;
+    transform: rotateX(2deg);
+    transform-origin: 50% 50%;
+  }
+  
+  /* Corner distortions */
+  .crt::before {
     content: "";
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0) 100%);
-    z-index: 2;
+    inset: 0;
+    background: transparent;
+    transform: scale(1.1);
     pointer-events: none;
+    border-radius: 12px;
+    clip-path: polygon(
+      /* Top left corner */
+      0 0,
+      2% 2%,
+      2% 6%,
+      0 5%,
+      /* Top edge */
+      0 0,
+      100% 0,
+      /* Top right corner */
+      100% 5%,
+      98% 6%,
+      98% 2%,
+      100% 0,
+      /* Right edge */
+      100% 0,
+      100% 100%,
+      /* Bottom right corner */
+      100% 95%,
+      98% 94%,
+      98% 98%,
+      100% 100%,
+      /* Bottom edge */
+      100% 100%,
+      0 100%,
+      /* Bottom left corner */
+      0 95%,
+      2% 94%,
+      2% 98%,
+      0 100%
+    );
+  }
+  
+  /* Scanline effect */
+  .crt::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.1) 0px,
+      rgba(0, 0, 0, 0.1) 1px,
+      transparent 1px,
+      transparent 2px
+    );
+    pointer-events: none;
+    opacity: 0.5;
   }
   
   

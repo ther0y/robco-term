@@ -483,8 +483,30 @@ export default function TerminalHacking() {
   };
 
   return (
-    <div className="crt-screen bg-black p-8 max-w-4xl mx-auto">
-      <div className="crt font-mono text-green-500 p-8 rounded-lg flex flex-col min-h-[600px]">
+    <div className="crt-screen bg-black p-8 max-w-4xl mx-auto relative">
+      {/* Corner indents */}
+      <div className="absolute inset-0 pointer-events-none">
+        {/* Top left */}
+        <div className="absolute top-0 left-0 w-16 h-16 bg-gradient-to-br from-black via-transparent to-transparent" />
+        {/* Top right */}
+        <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-black via-transparent to-transparent" />
+        {/* Bottom left */}
+        <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-black via-transparent to-transparent" />
+        {/* Bottom right */}
+        <div className="absolute bottom-0 right-0 w-16 h-16 bg-gradient-to-tl from-black via-transparent to-transparent" />
+      </div>
+
+      {/* Main terminal content */}
+      <div className="crt relative bg-black text-green-500 p-8 pb-16 font-mono text-base rounded-lg border border-green-500 min-h-[600px] flex flex-col">
+        {/* Terminal border glow */}
+        <div
+          className="absolute inset-0 rounded-lg border-2 border-green-500/30 pointer-events-none"
+          style={{
+            boxShadow:
+              "0 0 15px rgba(34, 197, 94, 0.2), inset 0 0 15px rgba(34, 197, 94, 0.2)",
+          }}
+        />
+
         <h1 className="text-2xl mb-6">
           ROBCO INDUSTRIES (TM) TERMLINK PROTOCOL
         </h1>
@@ -493,7 +515,7 @@ export default function TerminalHacking() {
           <div className="flex-none">
             <div
               ref={boardRef}
-              className="flex flex-col gap-1 select-none cursor-default font-mono"
+              className="flex flex-col gap-1 select-none cursor-default font-mono text-base"
               style={{
                 userSelect: "none",
                 height: `${BOARD_HEIGHT * 1.5}em`,
@@ -503,7 +525,7 @@ export default function TerminalHacking() {
               {renderBoard()}
             </div>
           </div>
-          <div className="border-l border-green-500 pl-8 w-48">
+          <div className="border-l border-green-500 pl-8 w-56">
             <div
               className="h-full"
               style={{ height: `${BOARD_HEIGHT * 1.5}em` }}

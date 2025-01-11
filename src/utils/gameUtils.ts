@@ -1,30 +1,37 @@
-const WORDS = [
-  "SYSTEM",
-  "ACCESS",
-  "CIPHER",
-  "SECURE",
-  "BREACH",
-  "DECODE",
-  "HACKER",
-  "BINARY",
-  "CRYPTO",
-  "FIREWALL",
-  "NETWORK",
-  "PROTOCOL",
-  "TERMINAL",
-  "VIRUS",
-  "BYPASS",
-  "EXPLOIT",
-  "MALWARE",
-  "TROJAN",
-  "WORM",
-  "SPYWARE",
-  "ROOTKIT",
-];
+import * as randomWords from "random-words";
 
 export function generateWords(length: number, count: number): string[] {
-  const validWords = WORDS.filter((word) => word.length === length);
-  return validWords.sort(() => 0.5 - Math.random()).slice(0, count);
+  const words = new Set<string>();
+
+  // Generate more words than needed to ensure we have enough after filtering
+  const candidates = (
+    randomWords.generate({ exactly: count * 3, maxLength: length }) as string[]
+  )
+    .map((word: string) => word.toUpperCase())
+    .filter((word: string) => word.length === length);
+
+  // If we don't have enough words of the exact length, generate more
+  while (candidates.length < count) {
+    const moreWords = (
+      randomWords.generate({
+        exactly: count * 2,
+        maxLength: length,
+      }) as string[]
+    )
+      .map((word: string) => word.toUpperCase())
+      .filter((word: string) => word.length === length);
+    candidates.push(...moreWords);
+  }
+
+  // Get random unique words
+  while (words.size < count && candidates.length > 0) {
+    const randomIndex = Math.floor(Math.random() * candidates.length);
+    const word = candidates[randomIndex];
+    words.add(word);
+    candidates.splice(randomIndex, 1);
+  }
+
+  return Array.from(words);
 }
 
 export function generateGarbage(length: number): string {
