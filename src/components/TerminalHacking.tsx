@@ -19,6 +19,11 @@ const BOARD_WIDTH = 12;
 const BOARD_HEIGHT = 16;
 const TOTAL_CHARS = BOARD_WIDTH * BOARD_HEIGHT * 2;
 
+type HistoryEntry = {
+  guess: string;
+  result: string;
+};
+
 function getInitialMobileState() {
   // Check if window is defined (we're in the browser)
   if (typeof window !== "undefined") {
@@ -55,21 +60,21 @@ export default function TerminalHacking() {
   const [showMobile, setShowMobile] = useState(getInitialMobileState());
   const [isLoading, setIsLoading] = useState(true);
   const [loadingText, setLoadingText] = useState("");
-  const [words, setWords] = useState<string[]>([]);
-  const [password, setPassword] = useState("");
-  const [attempts, setAttempts] = useState(MAX_ATTEMPTS);
-  const [gameOver, setGameOver] = useState(false);
-  const [gameOverMessage, setGameOverMessage] = useState("");
   const [board, setBoard] = useState("");
   const [cursorPosition, setCursorPosition] = useState(0);
-  const [guessHistory, setGuessHistory] = useState<
-    Array<{ guess: string; result: string }>
-  >([]);
+  const [password, setPassword] = useState("");
+  const [attempts, setAttempts] = useState(MAX_ATTEMPTS);
+  const [guessHistory, setGuessHistory] = useState<HistoryEntry[]>([]);
+  const [gameOverMessage, setGameOverMessage] = useState("");
+  const [words, setWords] = useState<string[]>([]);
+  const [gameOver, setGameOver] = useState(false);
   const [usedBracketPositions, setUsedBracketPositions] = useState<Set<number>>(
     new Set()
   );
   const [showTutorial, setShowTutorial] = useState(false);
   const boardRef = useRef<HTMLDivElement>(null);
+  const historyContainerRef = useRef<HTMLDivElement>(null);
+  const historyScrollThumbRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -226,38 +231,56 @@ export default function TerminalHacking() {
           });
           break;
         case "Enter":
+          // First check if we're on a word
           const wordInfo = findWordAtPosition(cursorPosition);
-          const bracketPair = findBracketPairAtPosition(cursorPosition);
-
           if (wordInfo && attempts > 0) {
-            handleGuess(wordInfo[1]);
-          } else if (bracketPair && attempts > 0) {
-            const [start, end] = bracketPair;
+            const [_startPos, selectedWord] = wordInfo;
+            const correctLetters = checkGuess(selectedWord, password);
 
-            // 1/10 chance to replenish attempts
-            if (Math.random() <= 0.2 && attempts < MAX_ATTEMPTS) {
-              setAttempts(MAX_ATTEMPTS);
+            if (correctLetters === WORD_LENGTH) {
+              setGameOver(true);
+              setGameOverMessage("ACCESS GRANTED. TERMINAL UNLOCKED.");
+              setGuessHistory((prev) => [
+                { guess: selectedWord, result: "Entry granted!" },
+                ...prev,
+              ]);
+              return;
+            }
 
-              // Mark this position as used
-              setUsedBracketPositions((prev) => new Set([...prev, start]));
+            setGuessHistory((prev) => [
+              {
+                guess: selectedWord,
+                result: `Entry denied. Likeness=${correctLetters}`,
+              },
+              ...prev,
+            ]);
 
-              // Add to history
-              const maxEntries = Math.floor((BOARD_HEIGHT * 1.5) / 4.5);
-              setGuessHistory((prev) => {
-                const newHistory = [...prev];
-                if (newHistory.length >= maxEntries) {
-                  newHistory.shift();
-                }
-                return [
-                  {
-                    guess: board.slice(start, end + 1),
-                    result: "Attempts replenished!",
-                  },
-                  ...newHistory,
-                ];
-              });
+            if (attempts <= 1) {
+              setGameOver(true);
+              setGameOverMessage(
+                "TERMINAL LOCKED. TOO MANY INCORRECT ATTEMPTS."
+              );
             } else {
-              // Find a random word position that isn't the password
+              setAttempts((prev) => prev - 1);
+            }
+            return;
+          }
+
+          // Then check for bracket pairs
+          const bracketPair = findBracketPairAtPosition(cursorPosition);
+          if (bracketPair && attempts > 0) {
+            const [start, end] = bracketPair;
+            const selectedWord = board.slice(start, end + 1);
+
+            // Check if this is a replenish attempts sequence
+            if (selectedWord.includes("REPLEN")) {
+              setAttempts(MAX_ATTEMPTS);
+              setGuessHistory((prev) => [
+                { guess: selectedWord, result: "Attempts replenished!" },
+                ...prev,
+              ]);
+            } else {
+              // Check if this is a dud removal sequence
               const allWordPositions: [number, string][] = [];
               for (let i = 0; i < TOTAL_CHARS - WORD_LENGTH; i++) {
                 const word = board.slice(i, i + WORD_LENGTH);
@@ -299,38 +322,20 @@ export default function TerminalHacking() {
                 }
                 setBoard(newBoard.join(""));
 
-                // Mark this position as used
-                setUsedBracketPositions((prev) => new Set([...prev, start]));
-
-                // Add to history
-                const maxEntries = Math.floor((BOARD_HEIGHT * 1.5) / 4.5);
-                setGuessHistory((prev) => {
-                  const newHistory = [...prev];
-                  if (newHistory.length >= maxEntries) {
-                    newHistory.shift();
-                  }
-                  return [
-                    {
-                      guess: board.slice(start, end + 1),
-                      result: `Dud removed: ${removedWord}`,
-                    },
-                    ...newHistory,
-                  ];
-                });
+                setGuessHistory((prev) => [
+                  {
+                    guess: selectedWord,
+                    result: `Dud removed: ${removedWord}`,
+                  },
+                  ...prev,
+                ]);
               }
             }
-          } else if (!wordInfo && attempts > 0) {
-            const maxEntries = Math.floor((BOARD_HEIGHT * 1.5) / 4.5);
-            setGuessHistory((prev) => {
-              const newHistory = [...prev];
-              if (newHistory.length >= maxEntries) {
-                newHistory.shift();
-              }
-              return [
-                { guess: "INVALID", result: "Invalid selection" },
-                ...newHistory,
-              ];
-            });
+          } else if (attempts > 0) {
+            setGuessHistory((prev) => [
+              { guess: "INVALID", result: "Invalid selection" },
+              ...prev,
+            ]);
           }
           break;
       }
@@ -352,38 +357,6 @@ export default function TerminalHacking() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
-
-  const handleGuess = useCallback(
-    (guess: string) => {
-      const correctLetters = checkGuess(guess, password);
-      const maxEntries = Math.floor((BOARD_HEIGHT * 1.5) / 4.5);
-
-      if (correctLetters === WORD_LENGTH) {
-        setGameOver(true);
-        setGameOverMessage("ACCESS GRANTED. TERMINAL UNLOCKED.");
-        return;
-      }
-
-      setGuessHistory((prev) => {
-        const newHistory = [
-          ...prev,
-          {
-            guess,
-            result: `Entry denied. Likeness=${correctLetters}`,
-          },
-        ];
-        return newHistory.slice(-maxEntries);
-      });
-
-      if (attempts <= 1) {
-        setGameOver(true);
-        setGameOverMessage("TERMINAL LOCKED. TOO MANY INCORRECT ATTEMPTS.");
-      } else {
-        setAttempts((prev) => prev - 1);
-      }
-    },
-    [attempts, password]
-  );
 
   const getHighlightClass = useCallback(
     (index: number) => {
@@ -450,23 +423,77 @@ export default function TerminalHacking() {
     return lines;
   };
 
-  const renderHistory = () => {
-    // Each entry takes 4.5em total (3em for content + 1.5em gap)
-    const maxEntries = Math.floor((BOARD_HEIGHT * 1.5) / 4.5); // Account for total entry height including gap
-    const recentHistory = guessHistory.slice(-maxEntries);
+  useEffect(() => {
+    const container = historyContainerRef.current;
+    const thumb = historyScrollThumbRef.current;
 
+    if (!container || !thumb) return;
+
+    // Scroll to top (latest entry in reversed flex layout)
+    container.scrollTop = 0;
+
+    const updateThumbSize = () => {
+      const viewportRatio = container.clientHeight / container.scrollHeight;
+      const thumbHeight = Math.max(20, viewportRatio * container.clientHeight);
+      thumb.style.height = `${thumbHeight}px`;
+      // Hide thumb when content fits viewport
+      thumb.style.opacity = viewportRatio < 1 ? "1" : "0";
+    };
+
+    const updateScrollThumb = () => {
+      const scrollPercentage =
+        container.scrollTop / (container.scrollHeight - container.clientHeight);
+      const maxTranslate = container.clientHeight - thumb.clientHeight;
+      thumb.style.transform = `translateY(${
+        scrollPercentage * maxTranslate
+      }px)`;
+    };
+
+    // Update thumb size initially and when content changes
+    updateThumbSize();
+    updateScrollThumb();
+
+    // Add scroll event listener
+    container.addEventListener("scroll", updateScrollThumb);
+
+    // Create observer for content changes
+    const observer = new ResizeObserver(() => {
+      updateThumbSize();
+      updateScrollThumb();
+    });
+
+    observer.observe(container);
+
+    return () => {
+      container.removeEventListener("scroll", updateScrollThumb);
+      observer.disconnect();
+    };
+  }, [guessHistory]); // Add guessHistory as dependency to re-run when content changes
+
+  const renderHistory = () => {
     return (
-      <div className="h-full">
-        {recentHistory.map((entry, index) => (
-          <div key={index} className="mb-[1.5em]">
-            <div className="text-green-500 leading-[1.5em] min-h-[1.5em] whitespace-pre-wrap">
-              {`>`} {entry.guess}
+      <div className="h-full relative">
+        <div
+          ref={historyContainerRef}
+          className="h-full overflow-y-auto scrollbar-none flex flex-col-reverse"
+        >
+          {guessHistory.map((entry, index) => (
+            <div key={index} className="mb-[1.5em]">
+              <div className="text-green-500 leading-[1.5em] min-h-[1.5em] whitespace-pre-wrap">
+                {`>`} {entry.guess}
+              </div>
+              <div className="text-gray-500 ml-2 leading-[1.5em] min-h-[1.5em] whitespace-pre-wrap">
+                {entry.result}
+              </div>
             </div>
-            <div className="text-gray-500 ml-2 leading-[1.5em] min-h-[1.5em] whitespace-pre-wrap">
-              {entry.result}
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
+        <div className="absolute top-0 right-0 w-1 h-full">
+          <div
+            ref={historyScrollThumbRef}
+            className="absolute bottom-0 w-full bg-green-500/20 transition-transform duration-100"
+          />
+        </div>
       </div>
     );
   };
@@ -658,10 +685,7 @@ export default function TerminalHacking() {
             </div>
           </div>
           <div className="border-l border-green-500 pl-8 w-56">
-            <div
-              className="h-full"
-              style={{ height: `${BOARD_HEIGHT * 1.5}em` }}
-            >
+            <div className="h-full" style={{ height: `27.5rem` }}>
               {renderHistory()}
             </div>
           </div>
