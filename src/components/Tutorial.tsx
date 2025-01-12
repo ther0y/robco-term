@@ -176,8 +176,8 @@ export function Tutorial({ onClose }: TutorialProps) {
                           Start with different words to maximize information
                         </li>
                         <li>
-                          Use bracket pairs when you're unsure to remove wrong
-                          options
+                          Use bracket pairs when you&apos;re unsure to remove
+                          wrong options
                         </li>
                         <li>
                           Watch your remaining attempts - use bracket pairs to
