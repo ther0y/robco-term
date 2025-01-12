@@ -2,7 +2,7 @@
 
 A faithful recreation of the Fallout series' terminal hacking minigame, built with Next.js, TypeScript, and Tailwind CSS.
 
-🎮 [Play the Game](https://robco-term.vercel.app) | 👨‍💻 [GitHub Repository](https://github.com/ther0y/robco-term)
+🎮 [Play the Game](https://rob-term.masood.dev) | 👨‍💻 [GitHub Repository](https://github.com/ther0y/robco-term)
 
 **Author:** [Masood](https://github.com/ther0y)
 
