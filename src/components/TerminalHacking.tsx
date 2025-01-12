@@ -245,7 +245,7 @@ export default function TerminalHacking() {
           // First check if we're on a word
           const wordInfo = findWordAtPosition(cursorPosition);
           if (wordInfo && attempts > 0) {
-            const [_startPos, selectedWord] = wordInfo;
+            const [, selectedWord] = wordInfo;
             const correctLetters = checkGuess(selectedWord, password);
 
             if (correctLetters === WORD_LENGTH) {
