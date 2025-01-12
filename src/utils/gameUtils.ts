@@ -47,32 +47,51 @@ export function checkGuess(guess: string, password: string): number {
     .length;
 }
 
-export function generateGameBoard(
-  words: string[],
-  totalLength: number
-): string {
-  const board = Array(totalLength).fill(".");
-  const usedIndices = new Set<number>();
+export function generateGameBoard(words: string[], totalChars: number): string {
+  const board = Array(totalChars).fill(".");
+  const wordLength = words[0].length;
+  const usedRanges: [number, number][] = [];
 
-  words.forEach((word) => {
-    let index: number;
-    do {
-      index = Math.floor(Math.random() * (totalLength - word.length + 1));
-    } while (
-      Array.from({ length: word.length }, (_, i) =>
-        usedIndices.has(index + i)
-      ).some(Boolean)
-    );
+  // Place each word
+  for (const word of words) {
+    let placed = false;
+    let attempts = 0;
+    const maxAttempts = 100;
 
-    for (let i = 0; i < word.length; i++) {
-      board[index + i] = word[i];
-      usedIndices.add(index + i);
+    while (!placed && attempts < maxAttempts) {
+      const position = Math.floor(Math.random() * (totalChars - wordLength));
+      const range: [number, number] = [position, position + wordLength - 1];
+
+      // Check if this position overlaps with any existing word (including 2-char buffer)
+      const hasOverlap = usedRanges.some(([start, end]) => {
+        // Add 2-char buffer on both sides
+        const bufferedStart = start - 2;
+        const bufferedEnd = end + 2;
+        return (
+          (range[0] >= bufferedStart && range[0] <= bufferedEnd) ||
+          (range[1] >= bufferedStart && range[1] <= bufferedEnd) ||
+          (bufferedStart >= range[0] && bufferedStart <= range[1])
+        );
+      });
+
+      if (!hasOverlap) {
+        // Place the word
+        for (let i = 0; i < word.length; i++) {
+          board[position + i] = word[i];
+        }
+        usedRanges.push(range);
+        placed = true;
+      }
+
+      attempts++;
     }
-  });
+  }
 
-  for (let i = 0; i < totalLength; i++) {
+  // Fill remaining spaces with random characters
+  const fillerChars = "!@#$%^&*(){}[]<>-_=+|;:',./?";
+  for (let i = 0; i < totalChars; i++) {
     if (board[i] === ".") {
-      board[i] = generateGarbage(1);
+      board[i] = fillerChars[Math.floor(Math.random() * fillerChars.length)];
     }
   }
 

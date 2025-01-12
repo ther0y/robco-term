@@ -133,31 +133,42 @@ export default function TerminalHacking() {
         // Find matching closing bracket in the same line
         const lineStart = Math.floor(position / BOARD_WIDTH) * BOARD_WIDTH;
         const lineEnd = lineStart + BOARD_WIDTH;
+        const line = board.slice(lineStart, lineEnd);
+        const relativePos = position - lineStart;
 
-        // Find all valid bracket sequences in the line
-        const sequences: [number, number][] = [];
+        // If it's an opening bracket, look for its matching closing bracket
+        const openIndex = openBrackets.indexOf(char);
+        if (openIndex !== -1) {
+          // Look for matching closing bracket after this position
+          for (let j = relativePos + 1; j < line.length; j++) {
+            const nextChar = line[j];
+            const absoluteJ = lineStart + j;
 
-        // For each opening bracket
-        for (let start = lineStart; start < lineEnd; start++) {
-          // Skip if this position was already used
-          if (usedBracketPositions.has(start)) continue;
+            // Skip if this position was already used
+            if (usedBracketPositions.has(absoluteJ)) continue;
 
-          const startChar = board[start];
-          const startBracketIndex = openBrackets.indexOf(startChar);
-          if (startBracketIndex === -1) continue;
-
-          // Look for its matching closing bracket
-          for (let end = start + 1; end < lineEnd; end++) {
-            if (board[end] === closeBrackets[startBracketIndex]) {
-              sequences.push([start, end]);
+            // Check if it's the matching closing bracket
+            if (nextChar === closeBrackets[openIndex]) {
+              return [position, absoluteJ];
             }
           }
         }
 
-        // Find the sequence that contains our cursor position
-        for (const [start, end] of sequences) {
-          if (position >= start && position <= end) {
-            return [start, end];
+        // If it's a closing bracket, look for its matching opening bracket before
+        const closeIndex = closeBrackets.indexOf(char);
+        if (closeIndex !== -1) {
+          // Look for matching opening bracket before this position
+          for (let j = relativePos - 1; j >= 0; j--) {
+            const prevChar = line[j];
+            const absoluteJ = lineStart + j;
+
+            // Skip if this position was already used
+            if (usedBracketPositions.has(absoluteJ)) continue;
+
+            // Check if it's the matching opening bracket
+            if (prevChar === openBrackets[closeIndex]) {
+              return [absoluteJ, position];
+            }
           }
         }
       }
@@ -258,7 +269,7 @@ export default function TerminalHacking() {
             if (attempts <= 1) {
               setGameOver(true);
               setGameOverMessage(
-                "TERMINAL LOCKED. TOO MANY INCORRECT ATTEMPTS."
+                `TERMINAL LOCKED.\nTOO MANY INCORRECT ATTEMPTS.\nCORRECT PASSWORD WAS: ${password}`
               );
             } else {
               setAttempts((prev) => prev - 1);
@@ -271,6 +282,13 @@ export default function TerminalHacking() {
           if (bracketPair && attempts > 0) {
             const [start, end] = bracketPair;
             const selectedWord = board.slice(start, end + 1);
+
+            // Mark these bracket positions as used
+            const newUsedPositions = new Set(usedBracketPositions);
+            for (let i = start; i <= end; i++) {
+              newUsedPositions.add(i);
+            }
+            setUsedBracketPositions(newUsedPositions);
 
             // Check if this is a replenish attempts sequence
             if (selectedWord.includes("REPLEN")) {
@@ -691,6 +709,26 @@ export default function TerminalHacking() {
           </div>
         </div>
       </div>
+
+      {/* Controls hint box */}
+      <div className="mt-8 text-green-500 font-mono text-sm">
+        <div className="border border-green-500/50 rounded p-4">
+          <div className="mb-2 text-green-500/80">CONTROLS:</div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <span className="text-green-500/60">↑ ↓ ← →</span>
+              <span className="ml-2 text-green-500/80">Navigate cursor</span>
+            </div>
+            <div>
+              <span className="text-green-500/60">ENTER</span>
+              <span className="ml-2 text-green-500/80">
+                Select word/brackets
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {renderGameOverModal()}
       {showTutorial && <Tutorial onClose={() => setShowTutorial(false)} />}
     </div>
