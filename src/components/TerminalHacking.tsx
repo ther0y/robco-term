@@ -19,7 +19,42 @@ const BOARD_WIDTH = 12;
 const BOARD_HEIGHT = 16;
 const TOTAL_CHARS = BOARD_WIDTH * BOARD_HEIGHT * 2;
 
+function getInitialMobileState() {
+  // Check if window is defined (we're in the browser)
+  if (typeof window !== "undefined") {
+    return window.innerWidth < 640;
+  }
+  return false; // Default to desktop on server
+}
+
+function MobileMessage() {
+  return (
+    <div className="bg-black min-h-screen flex items-center justify-center p-8">
+      <div className="crt relative bg-black text-green-500 border-2 border-green-500 p-8 rounded-lg text-center max-w-sm">
+        <div className="text-xl mb-4">ROBCO TERMINAL ACCESS DENIED!</div>
+        <div className="text-gray-500">
+          This terminal hacking simulation requires a desktop computer for
+          optimal functionality.
+          <br />
+          <br />
+          Please access from a desktop device to proceed.
+        </div>
+        <div
+          className="absolute inset-0 rounded-lg border-2 border-green-500/30 pointer-events-none"
+          style={{
+            boxShadow:
+              "0 0 15px rgba(34, 197, 94, 0.2), inset 0 0 15px rgba(34, 197, 94, 0.2)",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function TerminalHacking() {
+  const [showMobile, setShowMobile] = useState(getInitialMobileState());
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingText, setLoadingText] = useState("");
   const [words, setWords] = useState<string[]>([]);
   const [password, setPassword] = useState("");
   const [attempts, setAttempts] = useState(MAX_ATTEMPTS);
@@ -33,8 +68,21 @@ export default function TerminalHacking() {
   const [usedBracketPositions, setUsedBracketPositions] = useState<Set<number>>(
     new Set()
   );
-  const boardRef = useRef<HTMLDivElement>(null);
   const [showTutorial, setShowTutorial] = useState(false);
+  const boardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setShowMobile(window.innerWidth < 640);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  useEffect(() => {
+    startNewGame();
+  }, []);
 
   const startNewGame = useCallback(() => {
     const newWords = generateWords(WORD_LENGTH, WORD_COUNT);
@@ -49,10 +97,6 @@ export default function TerminalHacking() {
     setBoard(newBoard);
     setCursorPosition(0);
   }, []);
-
-  useEffect(() => {
-    startNewGame();
-  }, [startNewGame]);
 
   const findWordAtPosition = useCallback(
     (position: number): [number, string] | null => {
@@ -309,42 +353,37 @@ export default function TerminalHacking() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  const handleGuess = (guess: string) => {
-    const correctLetters = checkGuess(guess, password);
-    const maxEntries = Math.floor((BOARD_HEIGHT * 1.5) / 4.5);
+  const handleGuess = useCallback(
+    (guess: string) => {
+      const correctLetters = checkGuess(guess, password);
+      const maxEntries = Math.floor((BOARD_HEIGHT * 1.5) / 4.5);
 
-    const addHistoryEntry = (entry: { guess: string; result: string }) => {
+      if (correctLetters === WORD_LENGTH) {
+        setGameOver(true);
+        setGameOverMessage("ACCESS GRANTED. TERMINAL UNLOCKED.");
+        return;
+      }
+
       setGuessHistory((prev) => {
-        const newHistory = [...prev];
-        if (newHistory.length >= maxEntries) {
-          newHistory.shift(); // Remove oldest entry if at max
-        }
-        return [entry, ...newHistory];
+        const newHistory = [
+          ...prev,
+          {
+            guess,
+            result: `Entry denied. Likeness=${correctLetters}`,
+          },
+        ];
+        return newHistory.slice(-maxEntries);
       });
-    };
 
-    if (guess === password) {
-      const newEntry = { guess, result: "Exact match! Password accepted." };
-      addHistoryEntry(newEntry);
-      setGameOverMessage("ACCESS GRANTED - Terminal Unlocked");
-      setGameOver(true);
-    } else if (attempts <= 1) {
-      const newEntry = { guess, result: "Access denied." };
-      addHistoryEntry(newEntry);
-      setGameOverMessage(
-        `ACCESS DENIED - Terminal Locked\nThe password was: ${password}`
-      );
-      setGameOver(true);
-      setAttempts(0);
-    } else {
-      const newEntry = {
-        guess,
-        result: `Entry denied. Likeness=${correctLetters}`,
-      };
-      addHistoryEntry(newEntry);
-      setAttempts((prev) => prev - 1);
-    }
-  };
+      if (attempts <= 1) {
+        setGameOver(true);
+        setGameOverMessage("TERMINAL LOCKED. TOO MANY INCORRECT ATTEMPTS.");
+      } else {
+        setAttempts((prev) => prev - 1);
+      }
+    },
+    [attempts, password]
+  );
 
   const getHighlightClass = useCallback(
     (index: number) => {
@@ -417,7 +456,7 @@ export default function TerminalHacking() {
     const recentHistory = guessHistory.slice(-maxEntries);
 
     return (
-      <div className="h-full flex flex-col-reverse">
+      <div className="h-full">
         {recentHistory.map((entry, index) => (
           <div key={index} className="mb-[1.5em]">
             <div className="text-green-500 leading-[1.5em] min-h-[1.5em] whitespace-pre-wrap">
@@ -483,6 +522,90 @@ export default function TerminalHacking() {
       </div>
     );
   };
+
+  // Add loading sequence
+  useEffect(() => {
+    if (!showMobile) {
+      const loadingSteps = [
+        "ROBCO INDUSTRIES (TM) TERMLINK PROTOCOL",
+        "[    0.000000] Linux version 2.6.32-504.el6.x86_64",
+        "[    0.000000] KERNEL supported cpus:",
+        "[    0.008000] BIOS-provided physical RAM map:",
+        "[    0.015000] Scanning memory blocks... [OK]",
+        "[    0.020000] Loading security protocols... [OK]",
+        "[    0.025000] Initializing random number generator... [OK]",
+        "[    0.032000] Checking password database... [OK]",
+        "[    0.040000] Establishing secure connection... [OK]",
+        "[    0.045000] TERMINAL READY. ENTER PASSWORD.",
+      ];
+
+      let currentStep = 0;
+      const loadingInterval = setInterval(() => {
+        if (currentStep < loadingSteps.length) {
+          setLoadingText((prev) => prev + "\n" + loadingSteps[currentStep]);
+          currentStep++;
+        } else {
+          clearInterval(loadingInterval);
+          setTimeout(() => {
+            setIsLoading(false);
+            startNewGame();
+          }, 100);
+        }
+      }, 100); // Faster interval
+
+      return () => clearInterval(loadingInterval);
+    }
+  }, [showMobile]);
+
+  if (showMobile) {
+    return <MobileMessage />;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="crt-screen bg-black p-16 min-w-7xl w-[814px] mx-auto relative">
+        {/* Corner indents */}
+        <div className="absolute inset-0 pointer-events-none">
+          {/* Top left */}
+          <div className="absolute top-0 left-0 w-16 h-16 bg-gradient-to-br from-black via-transparent to-transparent" />
+          {/* Top right */}
+          <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-black via-transparent to-transparent" />
+          {/* Bottom left */}
+          <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-black via-transparent to-transparent" />
+          {/* Bottom right */}
+          <div className="absolute bottom-0 right-0 w-16 h-16 bg-gradient-to-tl from-black via-transparent to-transparent" />
+        </div>
+
+        <div className="crt relative bg-black text-green-500 p-8 pb-16 pt-12 font-mono text-base rounded-lg border border-green-500 min-h-[670px] flex flex-col">
+          <div
+            className="absolute inset-0 rounded-lg border-2 border-green-500/30 pointer-events-none"
+            style={{
+              boxShadow:
+                "0 0 15px rgba(34, 197, 94, 0.2), inset 0 0 15px rgba(34, 197, 94, 0.2)",
+            }}
+          />
+          <div className="flex justify-between items-center mb-6">
+            <h1 className="text-2xl">
+              ROBCO INDUSTRIES (TM) TERMLINK PROTOCOL
+            </h1>
+          </div>
+          <div className="flex-1">
+            <div
+              className="flex flex-col gap-1 select-none cursor-default font-mono text-base"
+              style={{
+                userSelect: "none",
+                height: `${BOARD_HEIGHT * 1.5}em`,
+                lineHeight: "1.5em",
+                width: `${BOARD_WIDTH * 2 * 2 + 16}ch`,
+              }}
+            >
+              <pre className="whitespace-pre-line">{loadingText}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="crt-screen bg-black p-16 max-w-4xl mx-auto relative">
