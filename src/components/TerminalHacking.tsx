@@ -11,6 +11,7 @@ import {
 
 import { Button } from "@/components/ui/Button";
 import { Tutorial } from "./Tutorial";
+import { soundManager } from "../utils/soundManager";
 
 const WORD_LENGTH = 6;
 const WORD_COUNT = 10;
@@ -75,6 +76,7 @@ export default function TerminalHacking() {
   const boardRef = useRef<HTMLDivElement>(null);
   const historyContainerRef = useRef<HTMLDivElement>(null);
   const historyScrollThumbRef = useRef<HTMLDivElement>(null);
+  const [hoverPosition, setHoverPosition] = useState<number | null>(null);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -188,6 +190,7 @@ export default function TerminalHacking() {
 
       switch (e.key) {
         case "ArrowUp":
+          soundManager.playSound("scroll_char");
           setCursorPosition((prev) => {
             const currentLine = Math.floor(prev / BOARD_WIDTH);
             const currentCol = prev % BOARD_WIDTH;
@@ -199,6 +202,7 @@ export default function TerminalHacking() {
           });
           break;
         case "ArrowDown":
+          soundManager.playSound("scroll_char");
           setCursorPosition((prev) => {
             const currentLine = Math.floor(prev / BOARD_WIDTH);
             const currentCol = prev % BOARD_WIDTH;
@@ -210,9 +214,11 @@ export default function TerminalHacking() {
           });
           break;
         case "ArrowLeft":
+          soundManager.playSound("scroll_char");
           setCursorPosition((prev) => {
             const currentCol = prev % BOARD_WIDTH;
             const currentLine = Math.floor(prev / BOARD_WIDTH);
+
             if (currentCol === 0) {
               // If at start of second column, jump to end of first column
               if (currentLine >= BOARD_HEIGHT) {
@@ -220,28 +226,42 @@ export default function TerminalHacking() {
                   (currentLine - BOARD_HEIGHT) * BOARD_WIDTH + (BOARD_WIDTH - 1)
                 );
               }
-              // If at start of first column, stay there
-              return prev;
+              // If at start of first column, wrap to end of second column of previous line
+              if (currentLine > 0) {
+                return (
+                  (currentLine - 1 + BOARD_HEIGHT) * BOARD_WIDTH +
+                  (BOARD_WIDTH - 1)
+                );
+              }
+              // At very start, wrap to end of last line
+              return (BOARD_HEIGHT * 2 - 1) * BOARD_WIDTH + (BOARD_WIDTH - 1);
             }
-            return Math.max(0, prev - 1);
+            return prev - 1;
           });
           break;
         case "ArrowRight":
+          soundManager.playSound("scroll_char");
           setCursorPosition((prev) => {
             const currentCol = prev % BOARD_WIDTH;
             const currentLine = Math.floor(prev / BOARD_WIDTH);
+
             if (currentCol === BOARD_WIDTH - 1) {
-              // If at end of first column and not in last line of first column,
-              // move to second column on same relative line
+              // If at end of first column, jump to start of second column
               if (currentLine < BOARD_HEIGHT) {
                 return (currentLine + BOARD_HEIGHT) * BOARD_WIDTH;
               }
-              return prev;
+              // If at end of second column, wrap to start of first column of next line
+              if (currentLine < BOARD_HEIGHT * 2 - 1) {
+                return (currentLine - BOARD_HEIGHT + 1) * BOARD_WIDTH;
+              }
+              // At very end, wrap to start of first line
+              return 0;
             }
-            return Math.min(TOTAL_CHARS - 1, prev + 1);
+            return prev + 1;
           });
           break;
         case "Enter":
+          soundManager.playSound("enter");
           // First check if we're on a word
           const wordInfo = findWordAtPosition(cursorPosition);
           if (wordInfo && attempts > 0) {
@@ -378,9 +398,38 @@ export default function TerminalHacking() {
 
   const getHighlightClass = useCallback(
     (index: number) => {
+      // Check cursor position first
       if (index === cursorPosition) {
         return "bg-green-500 text-black";
       }
+
+      // Check hover position
+      if (index === hoverPosition) {
+        return "bg-green-500 text-black";
+      }
+
+      // Check if part of hovered word/bracket
+      if (hoverPosition !== null) {
+        const hoveredWord = findWordAtPosition(hoverPosition);
+        const hoveredBracket = findBracketPairAtPosition(hoverPosition);
+
+        if (
+          hoveredWord &&
+          index >= hoveredWord[0] &&
+          index < hoveredWord[0] + WORD_LENGTH
+        ) {
+          return "bg-green-900";
+        }
+        if (
+          hoveredBracket &&
+          index >= hoveredBracket[0] &&
+          index <= hoveredBracket[1]
+        ) {
+          return "bg-green-900";
+        }
+      }
+
+      // Check if part of selected word/bracket
       const wordInfo = findWordAtPosition(cursorPosition);
       const bracketPair = findBracketPairAtPosition(cursorPosition);
 
@@ -396,7 +445,140 @@ export default function TerminalHacking() {
       }
       return "";
     },
-    [cursorPosition, findWordAtPosition, findBracketPairAtPosition]
+    [
+      cursorPosition,
+      hoverPosition,
+      findWordAtPosition,
+      findBracketPairAtPosition,
+    ]
+  );
+
+  const handleCharacterClick = useCallback(
+    (index: number) => {
+      if (gameOver) return;
+
+      // Check if clicking on a word
+      const wordInfo = findWordAtPosition(index);
+      if (wordInfo && attempts > 0) {
+        soundManager.playSound("enter");
+        const [, selectedWord] = wordInfo;
+        const correctLetters = checkGuess(selectedWord, password);
+
+        if (correctLetters === WORD_LENGTH) {
+          setGameOver(true);
+          setGameOverMessage("ACCESS GRANTED. TERMINAL UNLOCKED.");
+          setGuessHistory((prev) => [
+            { guess: selectedWord, result: "Entry granted!" },
+            ...prev,
+          ]);
+          return;
+        }
+
+        setGuessHistory((prev) => [
+          {
+            guess: selectedWord,
+            result: `Entry denied. Likeness=${correctLetters}`,
+          },
+          ...prev,
+        ]);
+
+        if (attempts <= 1) {
+          setGameOver(true);
+          setGameOverMessage(
+            `TERMINAL LOCKED.\nTOO MANY INCORRECT ATTEMPTS.\nCORRECT PASSWORD WAS: ${password}`
+          );
+        } else {
+          setAttempts((prev) => prev - 1);
+        }
+        return;
+      }
+
+      // Check if clicking on a bracket pair
+      const bracketPair = findBracketPairAtPosition(index);
+      if (bracketPair && attempts > 0) {
+        soundManager.playSound("enter");
+        const [start, end] = bracketPair;
+        const selectedWord = board.slice(start, end + 1);
+
+        // Mark these bracket positions as used
+        const newUsedPositions = new Set(usedBracketPositions);
+        for (let i = start; i <= end; i++) {
+          newUsedPositions.add(i);
+        }
+        setUsedBracketPositions(newUsedPositions);
+
+        // Rest of the bracket handling logic...
+        if (selectedWord.includes("REPLEN")) {
+          setAttempts(MAX_ATTEMPTS);
+          setGuessHistory((prev) => [
+            { guess: selectedWord, result: "Attempts replenished!" },
+            ...prev,
+          ]);
+        } else {
+          // Existing dud removal logic...
+          const allWordPositions: [number, string][] = [];
+          for (let i = 0; i < TOTAL_CHARS - WORD_LENGTH; i++) {
+            const word = board.slice(i, i + WORD_LENGTH);
+            if (words.includes(word) && word !== password) {
+              let isPasswordPosition = false;
+              for (let j = 0; j < WORD_LENGTH; j++) {
+                for (let k = 0; k < TOTAL_CHARS - WORD_LENGTH; k++) {
+                  if (
+                    board.slice(k, k + WORD_LENGTH) === password &&
+                    k <= i + j &&
+                    i + j < k + WORD_LENGTH
+                  ) {
+                    isPasswordPosition = true;
+                    break;
+                  }
+                }
+                if (isPasswordPosition) break;
+              }
+              if (!isPasswordPosition) {
+                allWordPositions.push([i, word]);
+              }
+            }
+          }
+
+          if (allWordPositions.length > 0) {
+            const [wordPos, removedWord] =
+              allWordPositions[
+                Math.floor(Math.random() * allWordPositions.length)
+              ];
+
+            const newBoard = board.split("");
+            for (let i = wordPos; i < wordPos + WORD_LENGTH; i++) {
+              newBoard[i] = ".";
+            }
+            setBoard(newBoard.join(""));
+
+            setGuessHistory((prev) => [
+              {
+                guess: selectedWord,
+                result: `Dud removed: ${removedWord}`,
+              },
+              ...prev,
+            ]);
+          }
+        }
+      } else if (attempts > 0) {
+        soundManager.playSound("enter");
+        setGuessHistory((prev) => [
+          { guess: "INVALID", result: "Invalid selection" },
+          ...prev,
+        ]);
+      }
+    },
+    [
+      gameOver,
+      findWordAtPosition,
+      attempts,
+      password,
+      findBracketPairAtPosition,
+      board,
+      words,
+      usedBracketPositions,
+    ]
   );
 
   const renderBoard = () => {
@@ -418,7 +600,12 @@ export default function TerminalHacking() {
             {leftChars.split("").map((char, j) => (
               <span
                 key={j}
-                className={`inline-block ${getHighlightClass(leftStart + j)}`}
+                className={`inline-block cursor-pointer ${getHighlightClass(
+                  leftStart + j
+                )}`}
+                onMouseEnter={() => setHoverPosition(leftStart + j)}
+                onMouseLeave={() => setHoverPosition(null)}
+                onClick={() => handleCharacterClick(leftStart + j)}
               >
                 {char}
               </span>
@@ -429,7 +616,12 @@ export default function TerminalHacking() {
             {rightChars.split("").map((char, j) => (
               <span
                 key={j}
-                className={`inline-block ${getHighlightClass(rightStart + j)}`}
+                className={`inline-block cursor-pointer ${getHighlightClass(
+                  rightStart + j
+                )}`}
+                onMouseEnter={() => setHoverPosition(rightStart + j)}
+                onMouseLeave={() => setHoverPosition(null)}
+                onClick={() => handleCharacterClick(rightStart + j)}
               >
                 {char}
               </span>
@@ -584,10 +776,24 @@ export default function TerminalHacking() {
         "[    0.045000] TERMINAL READY. ENTER PASSWORD.",
       ];
 
+      // Initialize audio context on first user interaction
+      const handleFirstInteraction = () => {
+        soundManager.playSound("powerOn");
+        setTimeout(() => soundManager.playSound("scrollLoop"), 500);
+        window.removeEventListener("keydown", handleFirstInteraction);
+        window.removeEventListener("click", handleFirstInteraction);
+      };
+
+      window.addEventListener("keydown", handleFirstInteraction, {
+        once: true,
+      });
+      window.addEventListener("click", handleFirstInteraction, { once: true });
+
       let currentStep = 0;
       const loadingInterval = setInterval(() => {
         if (currentStep < loadingSteps.length) {
           setLoadingText((prev) => prev + "\n" + loadingSteps[currentStep]);
+          soundManager.playSound("scroll");
           currentStep++;
         } else {
           clearInterval(loadingInterval);
@@ -596,11 +802,21 @@ export default function TerminalHacking() {
             startNewGame();
           }, 100);
         }
-      }, 100); // Faster interval
+      }, 100);
 
-      return () => clearInterval(loadingInterval);
+      return () => {
+        clearInterval(loadingInterval);
+        window.removeEventListener("keydown", handleFirstInteraction);
+        window.removeEventListener("click", handleFirstInteraction);
+      };
     }
   }, [showMobile]);
+
+  useEffect(() => {
+    if (gameOver) {
+      soundManager.playSound("powerOff");
+    }
+  }, [gameOver]);
 
   if (showMobile) {
     return <MobileMessage />;
